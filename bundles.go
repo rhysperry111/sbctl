@@ -1,6 +1,7 @@
 package sbctl
 
 import (
+    "bytes"
 	"debug/pe"
 	"encoding/json"
 	"errors"
@@ -71,7 +72,17 @@ func BundleIter(fn func(s *Bundle) error) error {
 func efiStubArch() (string, error) {
 	switch runtime.GOARCH {
 	case "amd64":
-		return "linuxx64.efi.stub", nil
+		// Check bitiness of UEFI as some 64-bit systems have 32-bit UEFI.
+		bitiness, err := os.ReadFile("/sys/firmware/efi/fw_platform_size")
+		if err != nil {
+			return "", err
+		}
+		switch bytes.TrimSpace(bitiness) {
+		case []bytes("64"):
+			return "linuxx64.efi.stub", nil
+		case []bytes("32"):
+			return "linuxia32.efi.stub", nil
+		}
 	case "arm64":
 		return "linuxaa64.efi.stub", nil
 	case "386":
@@ -96,7 +107,7 @@ func GetEfistub() (string, error) {
 			return f + stubName, nil
 		}
 	}
-	return "", fmt.Errorf("no EFI stub found")
+	return "", fmt.Errorf("no EFI stub found (%v)", stubName)
 }
 
 func NewBundle() (bundle *Bundle, err error) {
